@@ -11,24 +11,44 @@ public final class Transaction {
     private final String description;
     private final LocalDateTime transactionDate;
 
-    public Transaction(String transactionType, double amount, String description) {
+    public Transaction(String transactionType, double amount,
+                       String description) {
+
+        this(transactionType, amount, description, LocalDateTime.now());
+    }
+
+    // Constructor Overloading: Allows an existing transaction date to be restored.
+    public Transaction(String transactionType, double amount,
+                       String description, LocalDateTime transactionDate) {
 
         if (transactionType == null || transactionType.isBlank()) {
-            throw new IllegalArgumentException("Transaction type is required.");
+            throw new IllegalArgumentException(
+                    "Transaction type is required."
+            );
         }
 
         if (!Double.isFinite(amount) || amount <= 0) {
-            throw new IllegalArgumentException("Transaction amount must be greater than zero.");
+            throw new IllegalArgumentException(
+                    "Transaction amount must be greater than zero."
+            );
         }
 
         if (description == null || description.isBlank()) {
-            throw new IllegalArgumentException("Transaction description is required.");
+            throw new IllegalArgumentException(
+                    "Transaction description is required."
+            );
+        }
+
+        if (transactionDate == null) {
+            throw new IllegalArgumentException(
+                    "Transaction date is required."
+            );
         }
 
         this.transactionType = transactionType;
         this.amount = amount;
         this.description = description;
-        this.transactionDate = LocalDateTime.now();
+        this.transactionDate = transactionDate;
     }
 
     public String getTransactionType() {

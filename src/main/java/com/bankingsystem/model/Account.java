@@ -13,6 +13,7 @@ public abstract class Account implements InterestBearing {
 
     private final String accountNumber;
     private double balance;
+    private double openingDeposit;
     private final String branch;
     private final Customer customer;
     private final List<Transaction> transactions;
@@ -44,6 +45,7 @@ public abstract class Account implements InterestBearing {
 
         this.accountNumber = accountNumber.trim();
         this.balance = roundMoney(initialBalance);
+        this.openingDeposit = this.balance;
         this.branch = branch.trim();
         this.customer = customer;
         this.transactions = new ArrayList<>();
@@ -83,9 +85,7 @@ public abstract class Account implements InterestBearing {
         balance = roundMoney(newBalance);
 
         transactions.add(new Transaction(
-                "DEPOSIT",
-                validAmount,
-                description.trim()
+                "DEPOSIT", validAmount, description.trim()
         ));
     }
 
@@ -106,13 +106,11 @@ public abstract class Account implements InterestBearing {
         balance = roundMoney(balance - validAmount);
 
         transactions.add(new Transaction(
-                "WITHDRAWAL",
-                validAmount,
-                description.trim()
+                "WITHDRAWAL", validAmount, description.trim()
         ));
     }
 
-    // Prevents monthly interest from being applied more than once in the same month.
+    // Prevents interest from being applied twice in the same month.
     protected final double addMonthlyInterest(double rate) {
 
         YearMonth currentMonth = YearMonth.now();
@@ -134,7 +132,6 @@ public abstract class Account implements InterestBearing {
         }
 
         double interest = roundMoney(rawInterest);
-
         double newBalance = balance + interest;
 
         if (!Double.isFinite(newBalance)) {
@@ -148,9 +145,7 @@ public abstract class Account implements InterestBearing {
             balance = roundMoney(newBalance);
 
             transactions.add(new Transaction(
-                    "INTEREST",
-                    interest,
-                    "Monthly interest"
+                    "INTEREST", interest, "Monthly interest"
             ));
         }
 
@@ -185,6 +180,44 @@ public abstract class Account implements InterestBearing {
                 .doubleValue();
     }
 
+    // Used by the database layer when restoring an account.
+    public final void restorePersistedData(
+            double savedBalance,
+            double savedOpeningDeposit,
+            YearMonth savedInterestMonth,
+            List<Transaction> savedTransactions) {
+
+        if (!Double.isFinite(savedBalance) || savedBalance < 0
+                || !Double.isFinite(savedOpeningDeposit)
+                || savedOpeningDeposit < 0) {
+
+            throw new IllegalArgumentException(
+                    "Saved account amounts are invalid."
+            );
+        }
+
+        if (savedInterestMonth != null
+                && savedInterestMonth.isAfter(YearMonth.now())) {
+
+            throw new IllegalArgumentException(
+                    "Interest month cannot be in the future."
+            );
+        }
+
+        if (savedTransactions == null) {
+            throw new IllegalArgumentException(
+                    "Transaction history cannot be null."
+            );
+        }
+
+        this.balance = roundMoney(savedBalance);
+        this.openingDeposit = roundMoney(savedOpeningDeposit);
+        this.lastInterestMonth = savedInterestMonth;
+
+        transactions.clear();
+        transactions.addAll(savedTransactions);
+    }
+
     public abstract void withdraw(double amount);
 
     @Override
@@ -198,6 +231,10 @@ public abstract class Account implements InterestBearing {
         return balance;
     }
 
+    public double getOpeningDeposit() {
+        return openingDeposit;
+    }
+
     public String getBranch() {
         return branch;
     }
@@ -206,23 +243,11 @@ public abstract class Account implements InterestBearing {
         return customer;
     }
 
-    public List<Transaction> getTransactions() {
-        return Collections.unmodifiableList(transactions);
-    }
-
     public YearMonth getLastInterestMonth() {
         return lastInterestMonth;
     }
 
-    // Used when restoring an account from the database.
-    public void restoreLastInterestMonth(YearMonth month) {
-
-        if (month != null && month.isAfter(YearMonth.now())) {
-            throw new IllegalArgumentException(
-                    "Interest month cannot be in the future."
-            );
-        }
-
-        this.lastInterestMonth = month;
+    public List<Transaction> getTransactions() {
+        return Collections.unmodifiableList(transactions);
     }
 }
